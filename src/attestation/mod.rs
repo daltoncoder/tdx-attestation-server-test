@@ -83,7 +83,7 @@ impl AttestationAgent {
         })
     }
 
-    pub fn verify_attestation_report(
+    pub async fn verify_attestation_report(
         &self,
         quote: QuoteV4,
     ) -> Result<AttestationEvalEvidenceResponse> {
@@ -103,19 +103,19 @@ impl AttestationAgent {
 
         // tcb_type: 0: SGX, 1: TDX
         // version: TDX uses TcbInfoV3
-        let tcb_info = self.pccs.get_tcb_info(1, &fmspc, 3)?;
+        let tcb_info = self.pccs.get_tcb_info(1, &fmspc, 3).await?;
 
         // 4. Get Enclave Identity from PCCS
         let quote_version = quote.header.version;
-        let qe_identity = self.pccs.get_enclave_identity(quote_version as u32)?;
+        let qe_identity = self.pccs.get_enclave_identity(quote_version as u32).await?;
 
-        let (signing_ca, _) = self.pccs.get_certificate_by_id(CA::SIGNING)?;
+        let (signing_ca, _) = self.pccs.get_certificate_by_id(CA::SIGNING).await?;
 
         if signing_ca.is_empty() {
             return Err(anyhow!("Signing CA is empty".to_string()));
         }
 
-        let (_, pck_crl) = self.pccs.get_certificate_by_id(pck_type)?;
+        let (_, pck_crl) = self.pccs.get_certificate_by_id(pck_type).await?;
         if pck_crl.is_empty() {
             return Err(anyhow!("PCK CRL is empty".to_string()));
         }

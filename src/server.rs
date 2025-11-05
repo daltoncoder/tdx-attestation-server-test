@@ -62,6 +62,7 @@ impl TdxQuoteRpcServer for TdxQuoteServer {
         let quote = QuoteV4::from_bytes(&req.quote);
         self.attestation_agent
             .verify_attestation_report(quote)
+            .await
             .map_err(anyhow_to_rpc_error)
     }
 

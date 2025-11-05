@@ -4,16 +4,16 @@ use crate::attestation::CA;
 
 pub trait PccsProvider {
     fn new() -> Self;
-    fn get_tcb_info(&self, tcb_type: u8, fmspc: &str, version: u32) -> Result<Vec<u8>>;
+    async fn get_tcb_info(&self, tcb_type: u8, fmspc: &str, version: u32) -> Result<Vec<u8>>;
 
-    fn get_enclave_identity(&self, version: u32) -> Result<Vec<u8>>;
+    async fn get_enclave_identity(&self, version: u32) -> Result<Vec<u8>>;
 
-    fn get_certificate_by_id(&self, ca_id: CA) -> Result<(Vec<u8>, Vec<u8>)>;
+    async fn get_certificate_by_id(&self, ca_id: CA) -> Result<(Vec<u8>, Vec<u8>)>;
 }
 
 pub struct IntelPccs {
     base_url: String,
-    client: reqwest::blocking::Client,
+    client: reqwest::Client,
     subscription_key: Option<String>,
 }
 
@@ -21,7 +21,7 @@ impl PccsProvider for IntelPccs {
     fn new() -> Self {
         Self {
             base_url: "https://pccs.scrtlabs.com".to_string(),
-            client: reqwest::blocking::Client::builder()
+            client: reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
                 .build()
                 .expect("Failed to create HTTP client"),
@@ -35,7 +35,7 @@ impl PccsProvider for IntelPccs {
     /// * `tcb_type` - 0 for SGX, 1 for TDX
     /// * `fmspc` - Hex-encoded FMSPC value (12 hex chars representing 6 bytes)
     /// * `version` - API version (should be 4 for v4 API)
-    fn get_tcb_info(&self, tcb_type: u8, fmspc: &str, version: u32) -> Result<Vec<u8>> {
+    async fn get_tcb_info(&self, tcb_type: u8, fmspc: &str, version: u32) -> Result<Vec<u8>> {
         let tech = match tcb_type {
             0 => "sgx",
             1 => "tdx",
@@ -53,18 +53,21 @@ impl PccsProvider for IntelPccs {
             request = request.header("Ocp-Apim-Subscription-Key", key);
         }
 
-        let response = request.send().context("Failed to send TCB Info request")?;
+        let response = request
+            .send()
+            .await
+            .context("Failed to send TCB Info request")?;
 
         if !response.status().is_success() {
             return Err(anyhow!(
                 "TCB Info request failed with status {}: {}",
                 response.status(),
-                response.text().unwrap_or_default()
+                response.text().await.unwrap_or_default()
             ));
         }
 
         // Get the TCB Info JSON body
-        let tcb_info_json = response.bytes()?.to_vec();
+        let tcb_info_json = response.bytes().await?.to_vec();
 
         Ok(tcb_info_json)
     }
@@ -73,7 +76,7 @@ impl PccsProvider for IntelPccs {
     ///
     /// # Arguments
     /// * `version` - API version (should be 4 for v4 API)
-    fn get_enclave_identity(&self, version: u32) -> Result<Vec<u8>> {
+    async fn get_enclave_identity(&self, version: u32) -> Result<Vec<u8>> {
         // For TDX Quote verification, we typically need the TDX QE Identity
         let url = format!(
             "{}/tdx/certification/v{}/qe/identity",
@@ -88,17 +91,18 @@ impl PccsProvider for IntelPccs {
 
         let response = request
             .send()
+            .await
             .context("Failed to send QE Identity request")?;
 
         if !response.status().is_success() {
             return Err(anyhow!(
                 "QE Identity request failed with status {}: {}",
                 response.status(),
-                response.text().unwrap_or_default()
+                response.text().await.unwrap_or_default()
             ));
         }
 
-        let qe_identity_json = response.bytes()?.to_vec();
+        let qe_identity_json = response.bytes().await?.to_vec();
 
         Ok(qe_identity_json)
     }
@@ -108,7 +112,7 @@ impl PccsProvider for IntelPccs {
     ///
     /// # Arguments
     /// * `ca_id` - CA identifier (Processor or Platform)
-    fn get_certificate_by_id(&self, ca_id: CA) -> Result<(Vec<u8>, Vec<u8>)> {
+    async fn get_certificate_by_id(&self, ca_id: CA) -> Result<(Vec<u8>, Vec<u8>)> {
         let ca_str = match ca_id {
             CA::PROCESSOR => "processor",
             CA::PLATFORM => "platform",
@@ -127,13 +131,16 @@ impl PccsProvider for IntelPccs {
             crl_request = crl_request.header("Ocp-Apim-Subscription-Key", key);
         }
 
-        let crl_response = crl_request.send().context("Failed to send CRL request")?;
+        let crl_response = crl_request
+            .send()
+            .await
+            .context("Failed to send CRL request")?;
 
         if !crl_response.status().is_success() {
             return Err(anyhow!(
                 "CRL request failed with status {}: {}",
                 crl_response.status(),
-                crl_response.text().unwrap_or_default()
+                crl_response.text().await.unwrap_or_default()
             ));
         }
 
@@ -147,7 +154,7 @@ impl PccsProvider for IntelPccs {
             .as_bytes()
             .to_vec();
 
-        let crl = crl_response.bytes()?.to_vec();
+        let crl = crl_response.bytes().await?.to_vec();
 
         Ok((cert_chain, crl))
     }
@@ -159,7 +166,7 @@ impl IntelPccs {
     pub fn with_subscription_key(subscription_key: String) -> Self {
         Self {
             base_url: "https://api.trustedservices.intel.com".to_string(),
-            client: reqwest::blocking::Client::builder()
+            client: reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
                 .build()
                 .expect("Failed to create HTTP client"),
@@ -175,7 +182,7 @@ impl IntelPccs {
 
     /// Get TCB Info with issuer certificate chain
     /// Returns tuple of (tcb_info_json, issuer_chain_pem)
-    pub fn get_tcb_info_with_chain(
+    pub async fn get_tcb_info_with_chain(
         &self,
         tcb_type: u8,
         fmspc: &str,
@@ -198,13 +205,16 @@ impl IntelPccs {
             request = request.header("Ocp-Apim-Subscription-Key", key);
         }
 
-        let response = request.send().context("Failed to send TCB Info request")?;
+        let response = request
+            .send()
+            .await
+            .context("Failed to send TCB Info request")?;
 
         if !response.status().is_success() {
             return Err(anyhow!(
                 "TCB Info request failed with status {}: {}",
                 response.status(),
-                response.text().unwrap_or_default()
+                response.text().await.unwrap_or_default()
             ));
         }
 
@@ -218,14 +228,17 @@ impl IntelPccs {
             .as_bytes()
             .to_vec();
 
-        let tcb_info_json = response.bytes()?.to_vec();
+        let tcb_info_json = response.bytes().await?.to_vec();
 
         Ok((tcb_info_json, issuer_chain))
     }
 
     /// Get Enclave Identity with issuer certificate chain
     /// Returns tuple of (identity_json, issuer_chain_pem)
-    pub fn get_enclave_identity_with_chain(&self, version: u32) -> Result<(Vec<u8>, Vec<u8>)> {
+    pub async fn get_enclave_identity_with_chain(
+        &self,
+        version: u32,
+    ) -> Result<(Vec<u8>, Vec<u8>)> {
         let url = format!(
             "{}/tdx/certification/v{}/qe/identity",
             self.base_url, version
@@ -239,13 +252,14 @@ impl IntelPccs {
 
         let response = request
             .send()
+            .await
             .context("Failed to send QE Identity request")?;
 
         if !response.status().is_success() {
             return Err(anyhow!(
                 "QE Identity request failed with status {}: {}",
                 response.status(),
-                response.text().unwrap_or_default()
+                response.text().await.unwrap_or_default()
             ));
         }
 
@@ -263,7 +277,7 @@ impl IntelPccs {
             .into_owned()
             .into_bytes();
 
-        let identity_json = response.bytes()?.to_vec();
+        let identity_json = response.bytes().await?.to_vec();
 
         Ok((identity_json, issuer_chain))
     }
