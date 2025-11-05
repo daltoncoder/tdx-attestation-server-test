@@ -88,10 +88,7 @@ impl AttestationAgent {
         quote: QuoteV4,
     ) -> Result<AttestationEvalEvidenceResponse> {
         // 1. Get Root CA and root ca crl from PCCS
-        let RootCA {
-            root_ca,
-            root_ca_crl,
-        } = self.get_root_ca();
+        let (root_ca, root_ca_crl) = self.pccs.get_certificate_by_id(CA::ROOT).await?;
 
         if root_ca.is_empty() || root_ca_crl.is_empty() {
             return Err(anyhow!("Root CA or CRL is empty"));

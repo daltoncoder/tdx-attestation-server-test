@@ -112,52 +112,120 @@ impl PccsProvider for IntelPccs {
     ///
     /// # Arguments
     /// * `ca_id` - CA identifier (Processor or Platform)
+    /// Get certificate and CRL by CA ID (Root, Processor, or Platform CA)
+    /// Returns tuple of (certificate, crl)
+    ///
+    /// # Arguments
+    /// * `ca_id` - CA identifier (Root, Processor or Platform)
     async fn get_certificate_by_id(&self, ca_id: CA) -> Result<(Vec<u8>, Vec<u8>)> {
-        let ca_str = match ca_id {
-            CA::PROCESSOR => "processor",
-            CA::PLATFORM => "platform",
-            _ => return Err(anyhow!("unsupported CA")),
-        };
+        match ca_id {
+            CA::ROOT => {
+                // For Root CA, fetch the certificate directly
+                // Root CA doesn't have a CRL endpoint, so we return empty CRL
+                let cert_url = "https://certificates.trustedservices.intel.com/Intel_SGX_Provisioning_Certification_RootCA.cer";
 
-        // Get the CRL for this CA
-        let crl_url = format!(
-            "{}/sgx/certification/v4/pckcrl?ca={}&encoding=der",
-            self.base_url, ca_str
-        );
+                let cert_response = self
+                    .client
+                    .get(cert_url)
+                    .send()
+                    .await
+                    .context("Failed to fetch Root CA certificate")?;
 
-        let mut crl_request = self.client.get(&crl_url);
+                if !cert_response.status().is_success() {
+                    return Err(anyhow!(
+                        "Root CA certificate request failed with status {}: {}",
+                        cert_response.status(),
+                        cert_response.text().await.unwrap_or_default()
+                    ));
+                }
 
-        if let Some(key) = &self.subscription_key {
-            crl_request = crl_request.header("Ocp-Apim-Subscription-Key", key);
+                let cert = cert_response.bytes().await?.to_vec();
+
+                // Root CA doesn't have a CRL, return empty vector
+                Ok((cert, Vec::new()))
+            }
+            CA::PROCESSOR | CA::PLATFORM => {
+                let ca_str = match ca_id {
+                    CA::PROCESSOR => "processor",
+                    CA::PLATFORM => "platform",
+                    _ => unreachable!(),
+                };
+
+                // Get the CRL for this CA
+                let crl_url = format!(
+                    "{}/sgx/certification/v4/pckcrl?ca={}&encoding=der",
+                    self.base_url, ca_str
+                );
+
+                let mut crl_request = self.client.get(&crl_url);
+
+                if let Some(key) = &self.subscription_key {
+                    crl_request = crl_request.header("Ocp-Apim-Subscription-Key", key);
+                }
+
+                let crl_response = crl_request
+                    .send()
+                    .await
+                    .context("Failed to send CRL request")?;
+
+                if !crl_response.status().is_success() {
+                    return Err(anyhow!(
+                        "CRL request failed with status {}: {}",
+                        crl_response.status(),
+                        crl_response.text().await.unwrap_or_default()
+                    ));
+                }
+
+                // Extract the certificate chain from the response header
+                let cert_chain = crl_response
+                    .headers()
+                    .get("SGX-PCK-CRL-Issuer-Chain")
+                    .ok_or_else(|| anyhow!("Missing SGX-PCK-CRL-Issuer-Chain header"))?
+                    .to_str()
+                    .context("Invalid certificate chain header")?;
+
+                // URL decode the certificate chain
+                let cert_chain = urlencoding::decode(cert_chain)
+                    .context("Failed to URL decode certificate chain")?
+                    .into_owned()
+                    .into_bytes();
+
+                let crl = crl_response.bytes().await?.to_vec();
+
+                // The cert chain contains both Root CA and the intermediate CA (Processor/Platform)
+                // We need to parse and extract just the requested CA certificate
+                // The chain format is: <Intermediate CA Cert><Root CA Cert>
+                let cert = extract_first_certificate(&cert_chain)
+                    .context("Failed to extract CA certificate from chain")?;
+
+                Ok((cert, crl))
+            }
+            _ => return Err(anyhow!("unssuported CA")),
         }
-
-        let crl_response = crl_request
-            .send()
-            .await
-            .context("Failed to send CRL request")?;
-
-        if !crl_response.status().is_success() {
-            return Err(anyhow!(
-                "CRL request failed with status {}: {}",
-                crl_response.status(),
-                crl_response.text().await.unwrap_or_default()
-            ));
-        }
-
-        // Extract the certificate chain from the response header
-        let cert_chain = crl_response
-            .headers()
-            .get("SGX-PCK-CRL-Issuer-Chain")
-            .ok_or_else(|| anyhow!("Missing SGX-PCK-CRL-Issuer-Chain header"))?
-            .to_str()
-            .context("Invalid certificate chain header")?
-            .as_bytes()
-            .to_vec();
-
-        let crl = crl_response.bytes().await?.to_vec();
-
-        Ok((cert_chain, crl))
     }
+}
+
+/// Extract the first certificate from a PEM certificate chain
+fn extract_first_certificate(pem_chain: &[u8]) -> Result<Vec<u8>> {
+    let chain_str =
+        std::str::from_utf8(pem_chain).context("Certificate chain is not valid UTF-8")?;
+
+    // Find the first certificate in the chain
+    let begin_marker = "-----BEGIN CERTIFICATE-----";
+    let end_marker = "-----END CERTIFICATE-----";
+
+    let start = chain_str
+        .find(begin_marker)
+        .ok_or_else(|| anyhow!("No certificate found in chain"))?;
+
+    let end = chain_str[start..]
+        .find(end_marker)
+        .ok_or_else(|| anyhow!("Malformed certificate in chain"))?;
+
+    // Extract the first certificate including the markers
+    let cert = &chain_str[start..start + end + end_marker.len()];
+
+    Ok(cert.as_bytes().to_vec())
 }
 
 impl IntelPccs {
