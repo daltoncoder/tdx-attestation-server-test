@@ -45,10 +45,7 @@ impl TdxQuoteRpcServer for TdxQuoteServer {
     }
 
     /// Generates attestation evidence from the attestation authority
-    async fn get_attestation_evidence(
-        &self,
-        _req: AttestationGetEvidenceRequest,
-    ) -> RpcResult<AttestationGetEvidenceResponse> {
+    async fn get_attestation_evidence(&self) -> RpcResult<AttestationGetEvidenceResponse> {
         self.attestation_agent
             .get_attestation_evidence()
             .map_err(anyhow_to_rpc_error)
@@ -57,9 +54,10 @@ impl TdxQuoteRpcServer for TdxQuoteServer {
     /// Evaluates provided attestation evidence
     async fn eval_attestation_evidence(
         &self,
-        req: AttestationEvalEvidenceRequest,
+        hcl_report: Vec<u8>,
+        quote: Vec<u8>,
     ) -> RpcResult<AttestationEvalEvidenceResponse> {
-        let quote = QuoteV4::from_bytes(&req.quote);
+        let quote = QuoteV4::from_bytes(&quote);
         self.attestation_agent
             .verify_attestation_report(quote)
             .await

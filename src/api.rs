@@ -22,16 +22,14 @@ pub trait TdxQuoteRpc {
 
     /// Generates attestation evidence from the attestation authority
     #[method(name = "getAttestationEvidence")]
-    async fn get_attestation_evidence(
-        &self,
-        req: AttestationGetEvidenceRequest,
-    ) -> RpcResult<AttestationGetEvidenceResponse>;
+    async fn get_attestation_evidence(&self) -> RpcResult<AttestationGetEvidenceResponse>;
 
     /// Evaluates provided attestation evidence
     #[method(name = "evalAttestationEvidence")]
     async fn eval_attestation_evidence(
         &self,
-        req: AttestationEvalEvidenceRequest,
+        hcl_report: Vec<u8>,
+        quote: Vec<u8>,
     ) -> RpcResult<AttestationEvalEvidenceResponse>;
 
     /// Retrieves the root key from an existing node
