@@ -1,5 +1,4 @@
 pub mod pccs;
-pub mod tdx_types;
 pub mod utils;
 
 use anyhow::{Result, anyhow};
@@ -11,10 +10,7 @@ use dcap_rs::{
 };
 
 use crate::{
-    attestation::{
-        pccs::{IntelPccs, PccsProvider},
-        tdx_types::HclVarData,
-    },
+    attestation::pccs::{IntelPccs, PccsProvider},
     req_res::{AttestationEvalEvidenceResponse, AttestationGetEvidenceResponse},
 };
 
@@ -26,10 +22,8 @@ const EXPECTED_RTMR3: [u8; 48] = [0; 48];
 #[derive(Clone, Copy)]
 #[repr(u8)]
 pub enum CA {
-    ROOT,
     PROCESSOR,
     PLATFORM,
-    SIGNING,
     __Invalid,
 }
 
@@ -109,14 +103,4 @@ impl AttestationAgent {
 
         // todo we probably want to check more like mrtd for initial td state
     }
-}
-
-pub fn decode_var_data(var_data: &[u8]) -> HclVarData {
-    // Convert bytes to UTF-8 string
-    let json_str = std::str::from_utf8(var_data).unwrap();
-
-    // Parse JSON into struct
-    let hcl_data: HclVarData = serde_json::from_str(json_str).unwrap();
-
-    hcl_data
 }

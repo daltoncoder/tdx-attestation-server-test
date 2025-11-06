@@ -311,11 +311,3 @@ fn extract_first_certificate(pem_chain: &[u8]) -> Result<Vec<u8>> {
 
     Ok(cert.as_bytes().to_vec())
 }
-
-impl IntelPccs {
-    /// Set a custom base URL (useful for testing or using PCCS cache servers)
-    pub fn with_base_url(mut self, base_url: String) -> Self {
-        self.base_url = base_url;
-        self
-    }
-}

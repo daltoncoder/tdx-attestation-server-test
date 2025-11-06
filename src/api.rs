@@ -1,13 +1,12 @@
 use crate::req_res::{
-    AttestationEvalEvidenceRequest, AttestationEvalEvidenceResponse, AttestationGetEvidenceRequest,
-    AttestationGetEvidenceResponse, GetPurposeKeysRequest, GetPurposeKeysResponse,
-    PrepareEncryptedSnapshotRequest, PrepareEncryptedSnapshotResponse,
+    AttestationEvalEvidenceResponse, AttestationGetEvidenceResponse, GetPurposeKeysRequest,
+    GetPurposeKeysResponse, PrepareEncryptedSnapshotRequest, PrepareEncryptedSnapshotResponse,
     RestoreFromEncryptedSnapshotRequest, RestoreFromEncryptedSnapshotResponse,
-    RetrieveRootKeyRequest, RetrieveRootKeyResponse, ShareRootKeyRequest, ShareRootKeyResponse,
+    ShareRootKeyResponse,
 };
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 
-#[rpc(server)]
+#[rpc(client, server)]
 pub trait TdxQuoteRpc {
     /// Health check endpoint that returns "OK" if service is running
     #[method(name = "healthCheck")]
@@ -32,27 +31,9 @@ pub trait TdxQuoteRpc {
         quote: Vec<u8>,
     ) -> RpcResult<AttestationEvalEvidenceResponse>;
 
-    /// Retrieves the root key from an existing node
-    #[method(name = "boot.retrieve_root_key")]
-    async fn boot_retrieve_root_key(
-        &self,
-        req: RetrieveRootKeyRequest,
-    ) -> RpcResult<RetrieveRootKeyResponse>;
-
     /// Shares the root key with an existing node
     #[method(name = "boot.share_root_key")]
-    async fn boot_share_root_key(
-        &self,
-        req: ShareRootKeyRequest,
-    ) -> RpcResult<ShareRootKeyResponse>;
-
-    /// Genesis boot
-    #[method(name = "boot.genesis_boot")]
-    async fn boot_genesis(&self) -> RpcResult<()>;
-
-    /// Completes the genesis boot
-    #[method(name = "boot.complete_boot")]
-    async fn complete_boot(&self) -> RpcResult<()>;
+    async fn boot_share_root_key(&self, quote: Vec<u8>) -> RpcResult<ShareRootKeyResponse>;
 
     /// Prepares an encrypted snapshot
     #[method(name = "snapshot.prepare_encrypted_snapshot")]

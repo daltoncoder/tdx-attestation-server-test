@@ -98,20 +98,10 @@ pub struct RetrieveRootKeyResponse {}
 /// It is expected that the attestation is created with the following parameters:
 /// - runtime_data: Some(Data::Raw(req.retriever_pk.serialize().to_vec())),
 /// - runtime_data_hash_algorithm: HashAlgorithm::Sha256,
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ShareRootKeyRequest {
-    //todo
-    //     pub evidence: serde_json::Value,
-    //     pub tee: Tee,
-    //     pub retriever_pk: secp256k1::PublicKey,
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ShareRootKeyResponse {
-    //todo
-    //   pub nonce: Nonce,
-    pub root_key_ciphertext: Vec<u8>,
-    pub sharer_pk: secp256k1::PublicKey,
+    pub root_key: [u8; 32],
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
