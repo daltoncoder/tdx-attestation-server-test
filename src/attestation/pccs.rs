@@ -47,7 +47,7 @@ impl PccsProvider for IntelPccs {
         }
 
         // 2. get fmspc and pck_type from the quote cert
-        let (fmspc, pck_type) = get_pck_fmspc_and_issuer(&quote);
+        let (fmspc, pck_type) = get_pck_fmspc_and_issuer(quote);
 
         // 3. get TCB info from PCCS
 
@@ -229,8 +229,8 @@ impl PccsProvider for IntelPccs {
     ///
     /// # Arguments
     /// * `ca_id` - CA identifier (Processor or Platform)
-    /// Get certificate and CRL by CA ID (Root, Processor, or Platform CA)
-    /// Returns tuple of (certificate, crl)
+    ///   Get certificate and CRL by CA ID (Root, Processor, or Platform CA)
+    ///   Returns tuple of (certificate, crl)
     ///
     /// # Arguments
     /// * `ca_id` - CA identifier (Root, Processor or Platform)

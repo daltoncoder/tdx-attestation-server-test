@@ -11,7 +11,7 @@ use dcap_rs::{
 
 use crate::{
     attestation::pccs::{IntelPccs, PccsProvider},
-    req_res::{AttestationEvalEvidenceResponse, AttestationGetEvidenceResponse},
+    req_res::AttestationGetEvidenceResponse,
 };
 
 const EXPECTED_RTMR0: [u8; 48] = [0; 48];
@@ -70,17 +70,14 @@ impl AttestationAgent {
         })
     }
 
-    pub async fn verify_attestation_report(
-        &self,
-        quote: QuoteV4,
-    ) -> Result<AttestationEvalEvidenceResponse> {
+    pub async fn verify_attestation_report(&self, quote: QuoteV4) -> Result<()> {
         let collaterals = self.pccs.get_collateral(&quote).await?;
         let current_time = chrono::Utc::now().timestamp() as u64;
 
         match std::panic::catch_unwind(|| verify_quote_dcapv4(&quote, &collaterals, current_time)) {
             Ok(_) => {
                 self.verify_measurements(&quote)?;
-                Ok(AttestationEvalEvidenceResponse {})
+                Ok(())
             } // todo actually respond with something
             Err(e) => Err(anyhow!("DCAP Error: {:?}", e)),
         }

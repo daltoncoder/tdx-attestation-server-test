@@ -12,14 +12,6 @@ const PREFIX: &str = "seismic-purpose";
 #[derive(Zeroize, ZeroizeOnDrop)]
 pub struct Key([u8; 32]);
 
-impl Key {
-    /// Creates a new `Key` from the given byte vector.
-    ///
-    /// This is primarily used internally by the key manager when deriving keys.
-    fn new(bytes: [u8; 32]) -> Self {
-        Self(bytes)
-    }
-}
 impl AsRef<[u8]> for Key {
     fn as_ref(&self) -> &[u8] {
         &self.0

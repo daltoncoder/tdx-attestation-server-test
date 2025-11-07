@@ -2,12 +2,7 @@ use crate::{
     api::{TdxQuoteRpcClient, TdxQuoteRpcServer},
     attestation::AttestationAgent,
     key_manager::KeyManager,
-    req_res::{
-        AttestationEvalEvidenceResponse, AttestationGetEvidenceResponse, GetPurposeKeysRequest,
-        GetPurposeKeysResponse, PrepareEncryptedSnapshotRequest, PrepareEncryptedSnapshotResponse,
-        RestoreFromEncryptedSnapshotRequest, RestoreFromEncryptedSnapshotResponse,
-        ShareRootKeyResponse,
-    },
+    req_res::{AttestationGetEvidenceResponse, GetPurposeKeysResponse, ShareRootKeyResponse},
     utils::anyhow_to_rpc_error,
 };
 use dcap_rs::types::quotes::version_4::QuoteV4;
@@ -41,11 +36,13 @@ impl TdxQuoteRpcServer for TdxQuoteServer {
     }
 
     /// Get the secp256k1 public key
-    async fn get_purpose_keys(
-        &self,
-        req: GetPurposeKeysRequest,
-    ) -> RpcResult<GetPurposeKeysResponse> {
-        todo!()
+    async fn get_purpose_keys(&self, epoch: u64) -> RpcResult<GetPurposeKeysResponse> {
+        Ok(GetPurposeKeysResponse {
+            tx_io_sk: self.key_manager.get_tx_io_sk(epoch),
+            tx_io_pk: self.key_manager.get_tx_io_pk(epoch),
+            snapshot_key_bytes: self.key_manager.get_snapshot_key(epoch).into(),
+            rng_keypair: self.key_manager.get_rng_keypair(epoch),
+        })
     }
 
     /// Generates attestation evidence from the attestation authority
@@ -60,7 +57,7 @@ impl TdxQuoteRpcServer for TdxQuoteServer {
         &self,
         _hcl_report: Vec<u8>,
         quote: Vec<u8>,
-    ) -> RpcResult<AttestationEvalEvidenceResponse> {
+    ) -> RpcResult<()> {
         let quote = QuoteV4::from_bytes(&quote); // todo(dalton): This will panic if invalid quote bytes are sent find a way to catch or alternative
         self.attestation_agent
             .verify_attestation_report(quote)
@@ -84,18 +81,12 @@ impl TdxQuoteRpcServer for TdxQuoteServer {
     }
 
     /// Prepares an encrypted snapshot
-    async fn prepare_encrypted_snapshot(
-        &self,
-        req: PrepareEncryptedSnapshotRequest,
-    ) -> RpcResult<PrepareEncryptedSnapshotResponse> {
+    async fn prepare_encrypted_snapshot(&self) -> RpcResult<()> {
         todo!()
     }
 
     /// Restores from an encrypted snapshot
-    async fn restore_from_encrypted_snapshot(
-        &self,
-        req: RestoreFromEncryptedSnapshotRequest,
-    ) -> RpcResult<RestoreFromEncryptedSnapshotResponse> {
+    async fn restore_from_encrypted_snapshot(&self) -> RpcResult<()> {
         todo!()
     }
 }
@@ -129,7 +120,7 @@ pub async fn fetch_root_key_from_peers(
 ) -> KeyManager {
     // let peers: Vec<SocketAddr> = peers.iter().filter_map(|p| p.parse().ok()).collect();
 
-    if peers.len() < 1 {
+    if peers.is_empty() {
         panic!("Started in non-genesis with no valid peers");
     }
 

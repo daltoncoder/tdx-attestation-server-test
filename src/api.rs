@@ -1,8 +1,5 @@
 use crate::req_res::{
-    AttestationEvalEvidenceResponse, AttestationGetEvidenceResponse, GetPurposeKeysRequest,
-    GetPurposeKeysResponse, PrepareEncryptedSnapshotRequest, PrepareEncryptedSnapshotResponse,
-    RestoreFromEncryptedSnapshotRequest, RestoreFromEncryptedSnapshotResponse,
-    ShareRootKeyResponse,
+    AttestationGetEvidenceResponse, GetPurposeKeysResponse, ShareRootKeyResponse,
 };
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 
@@ -14,10 +11,7 @@ pub trait TdxQuoteRpc {
 
     /// Get the secp256k1 public key
     #[method(name = "getPurposeKeys")]
-    async fn get_purpose_keys(
-        &self,
-        req: GetPurposeKeysRequest,
-    ) -> RpcResult<GetPurposeKeysResponse>;
+    async fn get_purpose_keys(&self, epoch: u64) -> RpcResult<GetPurposeKeysResponse>;
 
     /// Generates attestation evidence from the attestation authority
     #[method(name = "getAttestationEvidence")]
@@ -25,11 +19,8 @@ pub trait TdxQuoteRpc {
 
     /// Evaluates provided attestation evidence
     #[method(name = "evalAttestationEvidence")]
-    async fn eval_attestation_evidence(
-        &self,
-        hcl_report: Vec<u8>,
-        quote: Vec<u8>,
-    ) -> RpcResult<AttestationEvalEvidenceResponse>;
+    async fn eval_attestation_evidence(&self, hcl_report: Vec<u8>, quote: Vec<u8>)
+    -> RpcResult<()>;
 
     /// Shares the root key with an existing node
     #[method(name = "boot.share_root_key")]
@@ -37,15 +28,9 @@ pub trait TdxQuoteRpc {
 
     /// Prepares an encrypted snapshot
     #[method(name = "snapshot.prepare_encrypted_snapshot")]
-    async fn prepare_encrypted_snapshot(
-        &self,
-        req: PrepareEncryptedSnapshotRequest,
-    ) -> RpcResult<PrepareEncryptedSnapshotResponse>;
+    async fn prepare_encrypted_snapshot(&self) -> RpcResult<()>;
 
     /// Restores from an encrypted snapshot
     #[method(name = "snapshot.restore_from_encrypted_snapshot")]
-    async fn restore_from_encrypted_snapshot(
-        &self,
-        req: RestoreFromEncryptedSnapshotRequest,
-    ) -> RpcResult<RestoreFromEncryptedSnapshotResponse>;
+    async fn restore_from_encrypted_snapshot(&self) -> RpcResult<()>;
 }

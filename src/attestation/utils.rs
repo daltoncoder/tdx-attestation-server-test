@@ -44,7 +44,7 @@ pub fn extract_fmspc_from_extension<'a>(cert: &'a X509Certificate<'a>) -> [u8; 6
 
     let mut i = sgx_extensions.content.as_ref();
 
-    while i.len() > 0 {
+    while !i.is_empty() {
         let (j, current_sequence) = Sequence::from_der(i).unwrap();
         i = j;
         let (j, current_oid) = Oid::from_der(current_sequence.content.as_ref()).unwrap();
